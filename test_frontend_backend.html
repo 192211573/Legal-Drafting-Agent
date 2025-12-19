@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frontend-Backend Connection Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-result { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .warning { background-color: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        textarea { width: 100%; height: 100px; margin: 10px 0; }
+        #results { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Legal Document Assistant - Connection Test</h1>
+    
+    <div class="test-result warning">
+        <strong>Instructions:</strong>
+        <ol>
+            <li>Make sure backend is running on http://localhost:8000</li>
+            <li>Make sure frontend is running on http://localhost:5174</li>
+            <li>Click the test buttons below to verify connections</li>
+        </ol>
+    </div>
+
+    <h2>Backend Connection Tests</h2>
+    <button onclick="testBackendHealth()">Test Backend Health</button>
+    <button onclick="testDraftingAgent()">Test Drafting Agent</button>
+    <button onclick="testTermExplanation()">Test Term Explanation</button>
+
+    <h2>Document Drafting Test</h2>
+    <div>
+        <label>Document Type:</label>
+        <select id="documentType">
+            <option value="service_agreement">Service Agreement</option>
+            <option value="nda">Non-Disclosure Agreement</option>
+            <option value="employment_contract">Employment Contract</option>
+        </select>
+    </div>
+    <div>
+        <label>Party 1:</label>
+        <input type="text" id="party1" value="Test Company Inc." />
+    </div>
+    <div>
+        <label>Party 2:</label>
+        <input type="text" id="party2" value="John Doe Consulting" />
+    </div>
+    <div>
+        <label>Jurisdiction:</label>
+        <input type="text" id="jurisdiction" value="California" />
+    </div>
+    <button onclick="testDocumentDrafting()">Create Legal Document</button>
+
+    <h2>Legal Term Explanation Test</h2>
+    <textarea id="legalText" placeholder="Enter legal text to explain...">The parties hereby agree to indemnify each other against liability for breach of confidentiality.</textarea>
+    <button onclick="testLegalTerms()">Explain Legal Terms</button>
+
+    <div id="results"></div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api';
+        
+        function addResult(message, type = 'success') {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.innerHTML = message;
+            results.appendChild(div);
+        }
+
+        async function testBackendHealth() {
+            try {
+                const response = await fetch('http://localhost:8000/health');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    addResult(`✅ Backend Health Check: ${data.status}`, 'success');
+                } else {
+                    addResult(`❌ Backend Health Check Failed: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Backend Connection Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testDraftingAgent() {
+            try {
+                // Test without authentication first
+                const response = await fetch(`${API_BASE}/drafting/templates`);
+                
+                if (response.status === 401) {
+                    addResult(`⚠️ Drafting API requires authentication (this is normal)`, 'warning');
+                } else if (response.ok) {
+                    const data = await response.json();
+                    addResult(`✅ Drafting API accessible: ${Object.keys(data.templates).length} templates available`, 'success');
+                } else {
+                    addResult(`❌ Drafting API Error: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Drafting API Connection Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testDocumentDrafting() {
+            const documentType = document.getElementById('documentType').value;
+            const party1 = document.getElementById('party1').value;
+            const party2 = document.getElementById('party2').value;
+            const jurisdiction = document.getElementById('jurisdiction').value;
+
+            const requestData = {
+                document_type: documentType,
+                parties: { party1, party2 },
+                terms: { service_description: 'Professional services' },
+                jurisdiction: jurisdiction,
+                special_instructions: 'Include standard clauses'
+            };
+
+            try {
+                // This will fail due to authentication, but we can test the endpoint
+                const response = await fetch(`${API_BASE}/drafting/draft-document`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestData)
+                });
+
+                if (response.status === 401) {
+                    addResult(`⚠️ Document drafting endpoint is working but requires authentication`, 'warning');
+                } else if (response.ok) {
+                    const data = await response.json();
+                    addResult(`✅ Document Created Successfully! Word count: ${data.word_count}`, 'success');
+                } else {
+                    addResult(`❌ Document Drafting Error: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Document Drafting Connection Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testLegalTerms() {
+            const legalText = document.getElementById('legalText').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/drafting/simple-explanation`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ legal_text: legalText })
+                });
+
+                if (response.status === 401) {
+                    addResult(`⚠️ Legal term explanation endpoint is working but requires authentication`, 'warning');
+                } else if (response.ok) {
+                    const data = await response.json();
+                    addResult(`✅ Legal Terms Explained! Found ${data.legal_terms_found.length} terms`, 'success');
+                } else {
+                    addResult(`❌ Legal Term Explanation Error: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Legal Term Explanation Connection Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testTermExplanation() {
+            try {
+                // Test the endpoint exists
+                const response = await fetch(`${API_BASE}/drafting/available-tasks`);
+                
+                if (response.status === 401) {
+                    addResult(`⚠️ Available tasks endpoint is working but requires authentication`, 'warning');
+                } else if (response.ok) {
+                    const data = await response.json();
+                    addResult(`✅ Available Tasks: ${data.total_tasks} tasks in ${Object.keys(data.categories).length} categories`, 'success');
+                } else {
+                    addResult(`❌ Available Tasks Error: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Available Tasks Connection Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-run basic tests on page load
+        window.onload = function() {
+            addResult('🚀 Starting connection tests...', 'warning');
+            testBackendHealth();
+            setTimeout(testDraftingAgent, 1000);
+            setTimeout(testTermExplanation, 2000);
+        };
+    </script>
+</body>
+</html>
